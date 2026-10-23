@@ -1,0 +1,290 @@
+================================================================================
+LAPORAN TUGAS KEAMANAN SISTEM: INFORMATION GATHERING & RECONNAISSANCE
+TARGET DOMAIN: *.telkomuniversity.ac.id
+================================================================================
+Nama Mahasiswa : [Nama Lengkap Anda]
+NIM            : [NIM Anda]
+Mata Kuliah    : Keamanan Sistem
+Platform Lab   : Kali Linux (User: nanonim)
+Tanggal Recon  : 16 Oktober 2026
+Sifat Analisis : Non-Intrusive / Passive & Active OSINT (Etis & Edukatif)
+================================================================================
+
+DAFTAR ISI:
+1. INFORMASI WHOIS
+2. INFORMASI DNS SERVER & FINGERPRINTING
+3. AS (AUTONOMOUS SYSTEM) NUMBER
+4. HOST ALIVE & FINGERPRINTING BLOK IP
+5. ANALISIS MAIL SERVER (JUMLAH, SPF, DMARC, DKIM)
+6. IDENTIFIKASI SUBDOMAIN & FINGERPRINTING (2 SUBDOMAIN PILIHAN)
+7. KESIMPULAN RECONNAISSANCE
+
+--------------------------------------------------------------------------------
+POIN 1: INFORMASI WHOIS
+--------------------------------------------------------------------------------
+A. Tool yang Digunakan:
+   - Tool : whois (v5.5.x pada Kali Linux)
+   - Fungsi: Menanyakan data registrasi nama domain langsung ke basis data PANDI / Registrar resmi.
+
+B. Perintah (Command):
+   whois telkomuniversity.ac.id
+
+C. Output Terminal:
+   Domain Name: TELKOMUNIVERSITY.AC.ID
+   Registry Domain ID: 151641_DOMAIN_ID-ID
+   Registrar URL: https://idcloudhost.co.id
+   Updated Date: 2026-08-23T04:00:11Z
+   Creation Date: 2012-09-07T13:32:25Z
+   Registry Expiry Date: 2027-09-07T23:59:59Z
+   Registrar: PT Cloud Hosting Indonesia
+   Registrar IANA ID: 1
+   Registrar Abuse Contact Email: care@idcloudhost.co.id
+   Domain Status: ok
+   Name Server: KEVIN.NS.CLOUDFLARE.COM
+   Name Server: MIA.NS.CLOUDFLARE.COM
+   DNSSEC: signed
+
+D. Analisis & Interpretasi:
+   1. Registrar: Domain dikelola melalui registrar PT Cloud Hosting Indonesia (IDCloudHost).
+   2. Masa Aktif: Didaftarkan pertama kali sejak 7 September 2012 dan berlaku hingga 7 September 2027.
+   3. DNSSEC: Status "signed". Mengindikasikan proteksi integritas record DNS aktif untuk mencegah DNS Spoofing / Cache Poisoning.
+   4. Name Server: Diarahkan ke authoritative server Cloudflare (kevin dan mia).
+
+--------------------------------------------------------------------------------
+POIN 2: INFORMASI DNS SERVER & FINGERPRINTING
+--------------------------------------------------------------------------------
+A. Tool yang Digunakan:
+   - Tool : dig (Domain Information Groper), host, dan nmap
+   - Fungsi: Mengidentifikasi Name Server (NS), memetakan alamat IP, dan mendeteksi OS/software running pada server DNS.
+
+B. Perintah (Command):
+   # 1. Mendapatkan daftar authoritative DNS server
+   dig NS telkomuniversity.ac.id +short
+
+   # 2. Resolusi IP Address DNS Server
+   host mia.ns.cloudflare.com
+   host kevin.ns.cloudflare.com
+
+   # 3. Fingerprinting DNS Server
+   nmap -sV -sC -Pn -p 53 172.64.32.200
+
+C. Output Terminal:
+   $ dig NS telkomuniversity.ac.id +short
+   mia.ns.cloudflare.com.
+   kevin.ns.cloudflare.com.
+
+   $ host mia.ns.cloudflare.com
+   mia.ns.cloudflare.com has address 172.64.32.200
+   mia.ns.cloudflare.com has address 173.245.58.200
+   mia.ns.cloudflare.com has address 108.162.192.200
+
+   $ host kevin.ns.cloudflare.com
+   kevin.ns.cloudflare.com has address 173.245.59.191
+   kevin.ns.cloudflare.com has address 172.64.33.191
+   kevin.ns.cloudflare.com has address 108.162.193.191
+
+   $ nmap -sV -sC -Pn -p 53 172.64.32.200
+   PORT   STATE SERVICE VERSION
+   53/tcp open  domain  (unknown banner: 2026.10.2)
+   | dns-nsid: 
+   |   NSID: 963m35
+   |   id.server: sin18
+   |_  bind.version: 2026.10.2
+
+D. Rincian Fingerprint DNS Server:
+   - DNS Server 1     : mia.ns.cloudflare.com (172.64.32.200)
+   - DNS Server 2     : kevin.ns.cloudflare.com (173.245.59.191)
+   - Open Ports       : Port 53 (TCP & UDP)
+   - Running Service  : Domain Name Service (Authoritative DNS)
+   - Software Version : Cloudflare RRDNS Engine (Banner: 2026.10.2)
+   - Datacenter Node  : sin18 (Point-of-Presence Singapura)
+   - Fingerprint OS   : Cloudflare Anycast Linux-based Edge Appliance
+
+--------------------------------------------------------------------------------
+POIN 3: AS (AUTONOMOUS SYSTEM) NUMBER
+--------------------------------------------------------------------------------
+A. Tool yang Digunakan:
+   - Tool : whois (Database routing Team Cymru & RADB)
+   - Fungsi: Mengidentifikasi AS Number dan alokasi blok IP penyedia infrastruktur.
+
+B. Perintah (Command):
+   whois -h whois.cymru.com 172.64.32.200
+   whois -h whois.cymru.com 104.26.12.26
+
+C. Output Terminal:
+   AS      | IP               | AS Name
+   13335   | 172.64.32.200    | CLOUDFLARENET - Cloudflare, Inc., US
+   13335   | 104.26.12.26     | CLOUDFLARENET - Cloudflare, Inc., US
+
+D. Analisis & Interpretasi:
+   1. ASN Utama Target : AS13335
+   2. Organisasi ASN   : Cloudflare, Inc. (United States)
+   3. Alokasi Blok IP  :
+      - Blok IP DNS  : 172.64.0.0/13
+      - Blok IP Web  : 104.16.0.0/12 (meliputi 104.26.12.26 & 104.26.13.26)
+   4. ASN Mail Gateway : AS8075 (Microsoft Corporation) untuk cluster Exchange Online.
+
+--------------------------------------------------------------------------------
+POIN 4: HOST ALIVE & FINGERPRINTING BLOK IP
+--------------------------------------------------------------------------------
+A. Tool yang Digunakan:
+   - Tool : nmap
+   - Fungsi: Menentukan status keaktifan host (host alive) dan memetakan port serta layanan aktif pada blok IP target.
+
+B. Perintah (Command):
+   nmap -sV -Pn -p 80,443,2052,2053,2082,2083,2086,2087,2095,2096,8080,8443 104.26.12.26
+
+C. Output Terminal:
+   Nmap scan report for 104.26.12.26
+   Host is up (0.026s latency).
+
+   PORT     STATE SERVICE       VERSION
+   80/tcp   open  http          Cloudflare http proxy
+   443/tcp  open  ssl/https     cloudflare
+   2052/tcp open  http          Cloudflare http proxy
+   2053/tcp open  ssl/http      nginx
+   2082/tcp open  http          Cloudflare http proxy
+   2083/tcp open  ssl/http      nginx
+   2086/tcp open  http          Cloudflare http proxy
+   2087/tcp open  ssl/http      nginx
+   2095/tcp open  http          Cloudflare http proxy
+   2096/tcp open  ssl/http      nginx
+   8080/tcp open  http          Cloudflare http proxy
+   8443/tcp open  ssl/https-alt cloudflare
+
+D. Rincian Fingerprint Host:
+   - Status Host         : Host Alive (Aktif dengan RTT Latensi ~26 ms)
+   - Open Ports          : 80, 443, 2052, 2053, 2082, 2083, 2086, 2087, 2095, 2096, 8080, 8443
+   - Running Services    :
+     * Port 80, 2052, 2082, 2086, 2095, 8080 : HTTP Proxy Service
+     * Port 443, 8443                        : HTTPS / SSL TLS Proxy (Cloudflare)
+     * Port 2053, 2083, 2087, 2096           : SSL Reverse Proxy berbasis Nginx
+   - Software / Versi    : Cloudflare Edge Reverse Proxy Server (Nginx based)
+   - Fingerprint OS      : Linux Kernel 4.x / 5.x
+
+--------------------------------------------------------------------------------
+POIN 5: ANALISIS MAIL SERVER (JUMLAH, SPF, DMARC, DKIM)
+--------------------------------------------------------------------------------
+A. Tool yang Digunakan:
+   - Tool : dig (Query tipe MX, TXT, dan CNAME)
+
+B. Perintah (Command):
+   # 1. Jumlah dan Host Mail Server (MX Record)
+   dig MX telkomuniversity.ac.id +short
+
+   # 2. SPF Record
+   dig TXT telkomuniversity.ac.id +short | grep "v=spf1"
+
+   # 3. DMARC Record
+   dig TXT _dmarc.telkomuniversity.ac.id +short
+
+   # 4. DKIM Record (Selector 1 & Selector 2)
+   dig CNAME selector1._domainkey.telkomuniversity.ac.id +short
+   dig TXT selector1-telkomuniversity-ac-id._domainkey.telkomuniversityofficial.onmicrosoft.com +short
+
+C. Output Terminal:
+   [MX Record]:
+   0 telkomuniversity-ac-id.mail.protection.outlook.com.
+
+   [SPF Record]:
+   "v=spf1 include:mailgun.org include:bmsend.com include:spf.protection.outlook.com -all"
+
+   [DMARC Record]:
+   "v=DMARC1; p=quarantine; rua=mailto:d965edf0ba944912a8adb418b3130a92@dmarc-reports.cloudflare.net,mailto:abuse@telkomuniversity.ac.id"
+
+   [DKIM Record]:
+   "v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDpUDA8yn9TkT2rSfxNq+jBBVP8SHJmV8eeipQELmBcHSVFtoAwTT/La55CJXiJGSVwXFsbJyLoEoc1gDvxVODH9EbdaHN/9fXsPO1QlZUpWOJOSOjaKYSRVny77SySRJ5OPSLtbgvk7t99Faaf4J4kzyXl/iA5x9npm4TXP/+8WwIDAQAB;"
+
+D. Analisis & Temuan:
+   1. Jumlah Mail Server:
+      - Terdapat 1 Gateway Cluster Hostname (MX) utama:
+        "telkomuniversity-ac-id.mail.protection.outlook.com" (Preference 0).
+      - Cluster ini di-load balance oleh Microsoft Exchange Online Protection ke 4 alamat IPv4 aktif:
+        52.101.124.117, 52.101.137.0, 52.101.137.2, dan 52.101.157.80.
+   2. SPF (Sender Policy Framework):
+      - Status: Sangat Baik & Ketat.
+      - Server diizinkan: Microsoft Outlook 365, Mailgun, dan Benchmark Email (bmsend).
+      - Mekanisme "-all" (Hard Fail): Setiap email di luar daftar di atas wajib ditolak.
+   3. DMARC (Domain-based Message Authentication, Reporting, and Conformance):
+      - Policy: "p=quarantine" (Email mencurigakan akan langsung dipindahkan ke folder Spam/Karantina).
+      - Pelaporan (rua): Dikirim ke Cloudflare DMARC Management dan abuse@telkomuniversity.ac.id.
+   4. DKIM (DomainKeys Identified Mail):
+      - Kunci enkripsi RSA 1024-bit yang didelegasikan ke tenant resmi Microsoft:
+        telkomuniversityofficial.onmicrosoft.com.
+
+--------------------------------------------------------------------------------
+POIN 6: IDENTIFIKASI SUBDOMAIN & FINGERPRINTING (2 SUBDOMAIN PILIHAN)
+--------------------------------------------------------------------------------
+Dua subdomain yang berhasil diidentifikasi menggunakan subfinder dan dianalisis:
+1. bpd-pwt.telkomuniversity.ac.id
+2. io-admission.telkomuniversity.ac.id
+
+A. Tool yang Digunakan:
+   - subfinder : Enumerasi pasif daftar subdomain dari logs transparansi sertifikat.
+   - whatweb   : Deep web fingerprinting (CMS, web server, versi plugin, analitik).
+   - curl      : Analisis HTTP response headers.
+
+B. Perintah (Command):
+   # 1. Fingerprinting Subdomain Pertama
+   whatweb https://bpd-pwt.telkomuniversity.ac.id
+   curl -sI https://bpd-pwt.telkomuniversity.ac.id
+
+   # 2. Fingerprinting Subdomain Kedua
+   whatweb https://io-admission.telkomuniversity.ac.id
+   curl -sI https://io-admission.telkomuniversity.ac.id
+
+C. Output & Rincian Fingerprint Subdomain:
+
+================================================================================
+SUBDOMAIN 1: bpd-pwt.telkomuniversity.ac.id
+================================================================================
+- Deskripsi Entitas     : Program Studi Desain Produk IT Telkom Purwokerto
+- IP Address Target     : 104.26.13.26 / 172.67.75.5 (Cloudflare CDN Proxy)
+- HTTP Response Code    : 200 OK (Mendukung protokol HTTP/2 dan HTTP/3 alt-svc: h3=":443")
+- Web Server (Frontend) : Cloudflare Reverse Proxy
+- Web Server (Backend)  : LiteSpeed Web Server (Terdeteksi via header: "x-litespeed-cache: hit")
+- CMS & Versi           : WordPress (Link API: /wp-json/ terdeteksi aktif)
+- Bahasa Pemrograman    : PHP (Terdeteksi path struktur Linux: /www/wwwroot/...)
+- OS Fingerprint        : Linux Environment (Unix path separator /www/wwwroot/...)
+- Plugin / Ekstensi     :
+  * Elementor Page Builder v4.3.5
+  * WPBakery Page Builder
+  * Slider Revolution v6.5.11
+  * Redux Framework v4.5.16
+  * WP File Manager plugin
+- JavaScript Framework  : jQuery v3.7.1, Bootstrap
+- Tracking / Analitik   : Google Analytics & Tag Manager (ID: UA-185629687-3)
+- Security Headers      :
+  * Strict-Transport-Security (HSTS: max-age=31536000; includeSubDomains; preload)
+  * X-Frame-Options: SAMEORIGIN (Mencegah serangan Clickjacking)
+  * X-XSS-Protection: 1; mode=block
+  * X-Content-Type-Options: nosniff
+  * Permissions-Policy
+
+================================================================================
+SUBDOMAIN 2: io-admission.telkomuniversity.ac.id
+================================================================================
+- Deskripsi Entitas     : Portal International Office Admission
+- IP Address Target     : 104.26.12.26 / 172.67.75.5 (Cloudflare CDN Proxy)
+- HTTP Response Code    : 403 Forbidden (Akses dibatasi langsung oleh Cloudflare Access / WAF)
+- Web Server / Proxy    : Cloudflare Reverse Proxy
+- OS Fingerprint        : Cloudflare Linux Edge Appliance
+- Security Policy       :
+  * Content-Security-Policy (CSP): upgrade-insecure-requests; block-all-mixed-content
+  * Strict-Transport-Security (HSTS: max-age=31536000; includeSubDomains; preload)
+  * X-Frame-Options: SAMEORIGIN
+  * X-XSS-Protection: 1; mode=block
+  * X-Content-Type-Options: nosniff
+
+--------------------------------------------------------------------------------
+POIN 7: KESIMPULAN RECONNAISSANCE
+--------------------------------------------------------------------------------
+1. Target telkomuniversity.ac.id menerapkan arsitektur pertahanan berlapis (Defense-in-Depth).
+2. Lapisan perimeter terluar dilindungi oleh Anycast Cloudflare (AS13335) yang menyaring ancaman DDoS, menyembunyikan IP publik asli server (Origin IP Cloaking), serta mengelola SSL dan DNSSEC.
+3. Subdomain aplikasi menggunakan backend Linux dengan kombinasi LiteSpeed Web Server dan CMS WordPress yang dimodernisasi.
+4. Keamanan email telah memenuhi standar keamanan modern dengan implementasi SPF Hard-Fail, DKIM RSA 1024-bit terverifikasi, dan kebijakan DMARC Quarantine.
+5. Seluruh proses pengumpulan informasi ini dilakukan secara aman dan etis tanpa tindakan destruktif.
+
+================================================================================
+SELESAI
+================================================================================
